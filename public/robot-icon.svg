@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="robotGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#337778" />
+      <stop offset="100%" stop-color="#2a6060" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Robot head -->
+  <rect x="25" y="20" width="50" height="40" rx="6" fill="url(#robotGradient)" />
+  
+  <!-- Robot eyes -->
+  <circle cx="40" cy="35" r="7" fill="#f3c04c" />
+  <circle cx="60" cy="35" r="7" fill="#f3c04c" />
+  <circle cx="40" cy="35" r="3" fill="#ffffff" />
+  <circle cx="60" cy="35" r="3" fill="#ffffff" />
+  
+  <!-- Robot mouth -->
+  <rect x="38" y="50" width="24" height="3" rx="1" fill="#f3c04c" />
+  
+  <!-- Robot antenna -->
+  <rect x="48" y="10" width="4" height="10" fill="#2a6060" />
+  <circle cx="50" cy="10" r="5" fill="#f3c04c" />
+  
+  <!-- Robot body -->
+  <rect x="35" y="60" width="30" height="25" rx="4" fill="url(#robotGradient)" />
+  
+  <!-- Robot details -->
+  <rect x="40" y="65" width="20" height="8" rx="2" fill="#f3c04c" opacity="0.8" />
+  <circle cx="50" cy="80" r="5" fill="#f3c04c" opacity="0.8" />
+</svg>
