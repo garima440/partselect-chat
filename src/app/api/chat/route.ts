@@ -54,6 +54,162 @@ function containsOutOfScopeContent(content: string): boolean {
   return patterns.some(pattern => pattern.test(contentLower));
 }
 
+// Function to verify product information in responses
+function verifyProductResponse(content: string, productResults: ProductResult[]): string {
+  // Skip verification if no products or empty content
+  if (!productResults.length || !content.trim()) {
+    return content;
+  }
+  
+  let verifiedContent = content;
+  let hasErrors = false;
+  
+  // Check each product for inaccurate descriptions
+  for (const product of productResults) {
+    const partNumberRegex = new RegExp(`\\b${product.partNumber}\\b`, 'i');
+    
+    // Only check if the part number is mentioned in the response
+    if (partNumberRegex.test(content)) {
+      // Define product types to check for
+      const productTypes = [
+        "water filter", "ice maker", "drawer", "fan", "motor", 
+        "thermostat", "valve", "pump", "door", "seal", "gasket",
+        "light", "bulb", "dispenser", "shelf", "element"
+      ];
+      
+      // Get the actual product type from name or subcategory
+      const actualType = product.subcategory || 
+        productTypes.find(type => product.name.toLowerCase().includes(type)) || 
+        "part";
+      
+      // Check for incorrect product type descriptions
+      for (const type of productTypes) {
+        // Skip if this is the actual product type
+        if (product.name.toLowerCase().includes(type) || 
+            product.subcategory?.toLowerCase().includes(type)) {
+          continue;
+        }
+        
+        // Look for incorrect associations
+        const typeRegex = new RegExp(`${product.partNumber}[^.]*?\\b${type}\\b`, 'i');
+        if (typeRegex.test(content)) {
+          console.log(`ERROR: Part ${product.partNumber} incorrectly described as "${type}" instead of "${product.name}"`);
+          hasErrors = true;
+          break;
+        }
+      }
+      
+      if (hasErrors) {
+        // Generate corrected response
+        verifiedContent = `I found information about part number ${product.partNumber}:
+
+This is a ${product.brand} ${product.name} for ${product.category}s${product.subcategory ? ` (${product.subcategory})` : ''}.
+
+Price: $${product.price.toFixed(2)}
+${product.inStock ? `✅ This part is currently in stock (${product.stockCount} available).` : '❌ This part is currently out of stock.'}
+
+${product.description}
+
+${product.compatibleModels && product.compatibleModels.length > 0 ? 
+`This part is compatible with models: ${product.compatibleModels.slice(0, 3).join(', ')}${product.compatibleModels.length > 3 ? ' and more' : ''}` : ''}
+
+Would you like more information about this part or help with anything else?`;
+        break;
+      }
+    }
+  }
+  
+  return verifiedContent;
+}
+
+
+function filterProductResults(
+  productResults: ProductResult[], 
+  toolCall: ToolCall, 
+  userMessage: string
+): ProductResult[] {
+  if (!productResults || productResults.length === 0) {
+    return [];
+  }
+  
+  const { args } = toolCall;
+  
+  // Case 1: If searching by specific part number, return only exact matches
+  if (args.partNumber && productResults.some(p => p.partNumber === args.partNumber)) {
+    return productResults.filter(p => p.partNumber === args.partNumber);
+  }
+  
+  // Case 2: If searching by model number, return only compatible products
+  if (args.modelNumber) {
+    const modelCompatible = productResults.filter(product => 
+      product.compatibleModels?.some(model => 
+        model.toLowerCase().includes(args.modelNumber.toLowerCase())
+      )
+    );
+    
+    if (modelCompatible.length > 0) {
+      return modelCompatible;
+    }
+  }
+  
+  // Case 3: If searching with query terms and model number, try to find products that match both
+  if (args.query && args.modelNumber) {
+    // Extract key terms from the query
+    const queryTerms = args.query.toLowerCase().split(/\s+/);
+    const significantTerms = queryTerms.filter((term: string) => 
+      term.length > 3 && 
+      !['the', 'and', 'with', 'for', 'this', 'that', 'what', 'have', 'does'].includes(term)
+    );
+    
+    if (significantTerms.length > 0) {
+      // Find products that match both query terms AND model compatibility
+      const matchingProducts = productResults.filter(product => {
+        // Check for term matches in name or description
+        const termMatches = significantTerms.some((term: string) => 
+          product.name.toLowerCase().includes(term) || 
+          (product.subcategory && product.subcategory.toLowerCase().includes(term)) ||
+          product.description.toLowerCase().includes(term)
+        );
+        
+        // Check for model compatibility
+        const modelMatch = product.compatibleModels?.some(model => 
+          model.toLowerCase().includes(args.modelNumber.toLowerCase())
+        );
+        
+        return termMatches && modelMatch;
+      });
+      
+      if (matchingProducts.length > 0) {
+        return matchingProducts;
+      }
+    }
+  }
+  
+  // Case 4: If limited number of results and scores are very different, return only the highest scoring
+  if (productResults.length > 1) {
+    // Sort by score (higher is better)
+    const sortedProducts = [...productResults].sort((a, b) => (b.score || 0) - (a.score || 0));
+    
+    // If top score is significantly better than second score, only return the top
+    if (sortedProducts.length >= 2 && 
+        (sortedProducts[0].score || 0) > (sortedProducts[1].score || 0) * 1.5) {
+      return [sortedProducts[0]];
+    }
+    
+    // If we have a lot of results, limit to highest similarity
+    if (sortedProducts.length > 2) {
+      // Get highest score
+      const highestScore = sortedProducts[0].score || 0;
+      
+      // Return only products with scores close to the highest
+      return sortedProducts.filter(p => (p.score || 0) >= highestScore * 0.7);
+    }
+  }
+  
+  // Default: return all products as they came from search
+  return productResults;
+}
+
 export interface SearchProductsRequest {
     query: string;
     category?: string;
@@ -169,9 +325,29 @@ async function executeToolCall(toolCall: ToolCall): Promise<any> {
         // Ensure args has the required query property
         const searchArgs: SearchProductsRequest = {
           query: args.query || '', // Default to empty string if not provided
-          ...args // Spread the rest of the arguments
+          partNumber: args.partNumber,
+          modelNumber: args.modelNumber,
+          category: args.category,
+          brand: args.brand,
+          limit: args.limit,
         };
-        return await searchProducts(searchArgs);
+        
+        const result = await searchProducts(searchArgs);
+        
+        // Enhanced logging for debugging
+        if (result.products && result.products.length > 0) {
+          console.log(`Found ${result.products.length} products:`, 
+            result.products.map(p => ({
+              partNumber: p.partNumber,
+              name: p.name,
+              category: p.category
+            }))
+          );
+        } else {
+          console.log('No products found for query:', searchArgs);
+        }
+        
+        return result;
         
       case 'get_installation_steps':
         return await getPartInstallationSteps(args.partNumber);
@@ -223,23 +399,47 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     
     // Make sure there's a system message
     if (!llmMessages.some(m => m.role === 'system')) {
-      // Use the same system message from useChat.ts
+      // Enhanced system message with product information accuracy guidelines
       const systemMessage: Message = {
         id: uuidv4(),
         role: 'system',
-        content: `You are the PartSelect customer service assistant, specialized EXCLUSIVELY in helping customers find and purchase refrigerator and dishwasher parts.
+        content: `You are the PartSelect customer service assistant, specialized in helping customers with refrigerator and dishwasher parts and issues.
+
+        YOUR CORE CAPABILITIES:
+        1. Provide information about refrigerator and dishwasher parts, including compatibility, pricing, and availability
+        2. Assist with troubleshooting common refrigerator and dishwasher problems
+        3. Offer installation guidance for replacement parts
+        4. Explain how different parts function within appliances
+        5. Recommend appropriate parts based on symptoms or issues described
         
-        IMPORTANT INSTRUCTION: If a user asks about ANY other appliance like ovens, microwaves, washing machines, stoves, or any topic outside of refrigerator and dishwasher parts, you MUST respond with:
-        "I'm sorry, I'm only able to assist with refrigerator and dishwasher parts at this time. I'd be happy to help you find parts, check compatibility, or troubleshoot issues with these specific appliances."
+        RESPONSE GUIDELINES:
+        1. Be DIRECT and CONCISE - Answer the user's specific question first before asking for additional information
+        2. For product queries, provide the most relevant information IMMEDIATELY (price, compatibility, availability)
+        3. Only ask for model numbers when NECESSARY for compatibility verification
+        4. Use SIMPLE formatting with minimal bold text - only highlight the most important details
+        5. Focus on ANSWERING THE QUESTION rather than demonstrating your knowledge
         
-        NEVER attempt to answer questions about other appliances even if you know the answer.
+        PRODUCT INFORMATION ACCURACY:
+        - When a specific part number is mentioned, ALWAYS describe it according to its EXACT product type from the database
+        - NEVER change the product type or category from what is in the database
+        - If you're uncertain about a specific part, acknowledge the limitation of your information rather than making assumptions
         
-        Your responsibilities:
-        1. Help customers identify the correct parts they need based on their appliance model, symptoms, or part numbers
-        2. Answer questions about product compatibility with specific appliance models
-        3. Provide installation guidance and troubleshooting tips for parts
-        4. Assist with understanding product specifications and features
-        5. Guide customers through the purchasing process`,
+        GENERAL KNOWLEDGE ABOUT APPLIANCES:
+        - You CAN provide general information about how refrigerators and dishwashers work
+        - You CAN offer general troubleshooting steps for common issues
+        - You CAN explain the function of different components within these appliances
+        - You CAN suggest DIY fixes for simple problems that don't require replacement parts
+        
+        OUT OF SCOPE:
+        - If a user asks about ANY other appliance like ovens, microwaves, washing machines, stoves, or topics completely unrelated to refrigerators and dishwashers, politely redirect:
+          "I'm sorry, I'm specialized in refrigerator and dishwasher information. I'd be happy to help with any questions about those appliances."
+        
+        CONVERSATION STYLE:
+        - Be helpful, friendly, and knowledgeable
+        - Use everyday language, avoiding overly technical terms unless necessary
+        - When explaining complex concepts, use analogies or simplified explanations
+        - For troubleshooting, use step-by-step instructions
+        - For part information, be precise and factual`,
         timestamp: Date.now(),
       };
       
@@ -293,15 +493,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         
         switch (toolCall.name) {
             case 'search_products':
-                if (result.products && result.products.length > 0) {
-                    productResults = result.products;
+
+            const filteredProducts = filterProductResults(
+              result.products, 
+              toolCall, 
+              lastUserMessage.content
+              );
+              
+              // Use the filtered products instead of all results
+              productResults = filteredProducts;
+              if (result.products && result.products.length > 0) {
+                  productResults = result.products;
+                  
+                  // Provide VERY explicit product information with strong guardrails
+                  additionalContext += `\n\n### RETRIEVED PRODUCT INFORMATION ###\n`;
+                  
+                  result.products.forEach((product: ProductResult, index: number) => {
+                    additionalContext += `\nProduct ${index + 1}:
+                    PART NUMBER: ${product.partNumber}
+                    EXACT PRODUCT TYPE: ${product.name}
+                    CATEGORY: ${product.category}
+                    SUBCATEGORY: ${product.subcategory || 'N/A'}
+                    BRAND: ${product.brand}
+                    PRICE: $${product.price.toFixed(2)}
+                    STOCK STATUS: ${product.inStock ? `In Stock (${product.stockCount} available)` : 'Out of Stock'}
+                    DESCRIPTION: ${product.description}
+                    ${product.compatibleModels ? `COMPATIBLE MODELS: ${product.compatibleModels.join(', ')}` : ''}
+
+                    IMPORTANT: When referring to part ${product.partNumber}, you MUST describe it as a "${product.name}" and NEVER as any other type of product.
+                    `;
+                                        });
+                    
+                    additionalContext += `\n### END PRODUCT INFORMATION ###\n`;
+                    
                     if (productResults.some(p => p.modelCompatibilityUnknown)) {
-                    additionalContext += `\n\nFound ${result.products.length} products that might help, but compatibility with model ${toolCall.args.modelNumber} couldn't be confirmed. These are our most relevant products for "${toolCall.args.query}".`;
-                    } else {
-                    additionalContext += `\n\nFound ${result.products.length} relevant products.`;
+                      additionalContext += `\nNOTE: Compatibility with model ${toolCall.args.modelNumber} couldn't be confirmed. The listed products are our most relevant options for "${toolCall.args.query}".\n`;
                     }
                 } else {
-                    additionalContext += `\n\nNo products found matching the search criteria.`;
+                    additionalContext += `\n\nNo products found matching the search criteria.\n`;
                 }
                 break;
             
@@ -357,6 +586,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Check if the LLM response inappropriately discusses out-of-scope appliances
     if (containsOutOfScopeContent(llmResponse.content)) {
       llmResponse.content = "I'm sorry, I'm only able to assist with refrigerator and dishwasher parts at this time. I'd be happy to help you find parts, check compatibility, or troubleshoot issues with these specific appliances.";
+    }
+    
+    // Verify product information
+    if (productResults.length > 0) {
+      llmResponse.content = verifyProductResponse(llmResponse.content, productResults);
     }
     
     // Create the assistant message

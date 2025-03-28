@@ -77,26 +77,51 @@ const SAMPLE_TROUBLESHOOTING_TIPS: TroubleshootingApplianceMap = {
 
 // Function to get installation steps for a part
 export async function getPartInstallationSteps(partNumber: string): Promise<{ steps: string[] }> {
-  // In a real app, fetch from database
-  const steps = SAMPLE_INSTALLATION_STEPS[partNumber] || [];
-  
-  return { steps };
+  try {
+    // First try to get the part from the vector database
+    const searchRequest = {
+      query: '',
+      partNumber: partNumber,
+      limit: 1,
+    };
+    
+    const { products } = await searchProductsInVectorDb(searchRequest);
+    
+    // If product found in vector DB and has installation steps
+    if (products.length > 0 && products[0].installationSteps && products[0].installationSteps.length > 0) {
+      console.log(`Found installation steps for part ${partNumber} in vector DB`);
+      return { steps: products[0].installationSteps };
+    }
+    
+    // Fallback to sample data if not found in vector DB
+    const sampleSteps = SAMPLE_INSTALLATION_STEPS[partNumber] || [];
+    if (sampleSteps.length > 0) {
+      console.log(`Found installation steps for part ${partNumber} in sample data`);
+      return { steps: sampleSteps };
+    }
+    
+    // No steps found anywhere
+    console.log(`No installation steps found for part ${partNumber}`);
+    return { steps: [] };
+  } catch (error) {
+    console.error(`Error getting installation steps for part ${partNumber}:`, error);
+    return { steps: [] };
+  }
 }
 
 // Function to check if a part is compatible with a model
 export async function checkCompatibility(
-  partNumber: string, 
+  partNumberOrDescription: string, 
   modelNumber: string
 ): Promise<{ compatible: boolean, details?: string }> {
   try {
-    // In a real app, query a compatibility database
-    // For this demo, we'll use the vector search to check compatibility
-    
+    // Use the description as a search query rather than an exact part number
     const searchRequest = {
-      query: `part ${partNumber} compatible with ${modelNumber}`,
-      partNumber: partNumber,
+      query: `${partNumberOrDescription} ${modelNumber}`,
       modelNumber: modelNumber,
-      limit: 1,
+      // Don't filter by part number directly if it's not in the right format
+      partNumber: partNumberOrDescription.match(/^[A-Z0-9\-]+$/) ? partNumberOrDescription : undefined,
+      limit: 5, // Increase to find more potential matches
     };
     
     const { products } = await searchProductsInVectorDb(searchRequest);
@@ -104,23 +129,30 @@ export async function checkCompatibility(
     if (products.length === 0) {
       return { 
         compatible: false, 
-        details: `No compatibility information found for part ${partNumber} with model ${modelNumber}.` 
+        details: `No compatibility information found for part ${partNumberOrDescription} with model ${modelNumber}.` 
       };
     }
     
-    const product = products[0];
+    // Check all returned products for compatibility
+    const compatibleProducts = products.filter(product => 
+      product.compatibleModels?.some(model => 
+        model.toLowerCase() === modelNumber.toLowerCase()
+      )
+    );
     
-    // Check if the model number is in the compatible models list
-    const isCompatible = product.compatibleModels?.some(model => 
-      model.toLowerCase() === modelNumber.toLowerCase()
-    ) || false;
-    
-    return {
-      compatible: isCompatible,
-      details: isCompatible
-        ? `Part ${partNumber} (${product.name}) is compatible with model ${modelNumber}.`
-        : `Part ${partNumber} (${product.name}) is NOT compatible with model ${modelNumber}.`
-    };
+    if (compatibleProducts.length > 0) {
+      const product = compatibleProducts[0];
+      return {
+        compatible: true,
+        details: `Part ${product.partNumber} (${product.name}) is compatible with model ${modelNumber}.`
+      };
+    } else {
+      const product = products[0];
+      return {
+        compatible: false,
+        details: `Part ${product.partNumber} (${product.name}) is NOT compatible with model ${modelNumber}.`
+      };
+    }
   } catch (error) {
     console.error('Error checking compatibility:', error);
     return { 
@@ -137,10 +169,30 @@ export async function getTroubleshootingTips(
   modelNumber?: string
 ): Promise<{ tips: string[] }> {
   try {
-    // Convert appliance type to lowercase for case-insensitive matching
-    const type = applianceType.toLowerCase();
+    // First try to find products that might address this issue
+    const searchRequest = {
+      query: `${applianceType} ${issue}`,
+      category: applianceType.toLowerCase(),
+      limit: 3,
+    };
     
-    // Find closest matching issue
+    const { products } = await searchProductsInVectorDb(searchRequest);
+    
+    // If relevant products found with troubleshooting tips
+    const allTips: string[] = [];
+    for (const product of products) {
+      if (product.troubleshootingTips && product.troubleshootingTips.length > 0) {
+        allTips.push(...product.troubleshootingTips);
+      }
+    }
+    
+    if (allTips.length > 0) {
+      console.log(`Found ${allTips.length} troubleshooting tips in product data`);
+      return { tips: allTips };
+    }
+    
+    // Fallback to sample data
+    const type = applianceType.toLowerCase();
     const appliance = SAMPLE_TROUBLESHOOTING_TIPS[type];
     
     if (!appliance) {
@@ -152,7 +204,6 @@ export async function getTroubleshootingTips(
     let bestScore = 0;
     
     for (const key in appliance) {
-      // Simple string matching - in a real app, use a more sophisticated matching algorithm
       const score = calculateSimilarity(issue.toLowerCase(), key.toLowerCase());
       
       if (score > bestScore) {
@@ -166,7 +217,6 @@ export async function getTroubleshootingTips(
       return { tips: appliance[bestMatch] };
     }
     
-    // Fallback: If no good match but we recognize the appliance type
     return { tips: [] };
   } catch (error) {
     console.error('Error getting troubleshooting tips:', error);
