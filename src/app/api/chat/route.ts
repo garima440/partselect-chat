@@ -8,6 +8,52 @@ import { getPartInstallationSteps, checkCompatibility, getTroubleshootingTips } 
 export const runtime = 'edge';
 export const maxDuration = 30; // 30 seconds maximum duration
 
+// Function to check if a query is about unsupported appliances
+function isOutOfScope(query: string): boolean {
+  const queryLower = query.toLowerCase();
+  
+  // Keywords for unsupported appliances
+  const unsupportedAppliances = [
+    'oven', 'microwave', 'washing machine', 'washer', 'dryer', 
+    'stove', 'range', 'air conditioner', 'blender', 'toaster'
+  ];
+  
+  // Check for explicit mentions of unsupported appliances
+  for (const appliance of unsupportedAppliances) {
+    const patterns = [
+      new RegExp(`\\b${appliance}\\b`, 'i'),
+      new RegExp(`my\\s+${appliance}`, 'i'),
+      new RegExp(`recommend.*\\s+${appliance}`, 'i'),
+      new RegExp(`best\\s+${appliance}`, 'i'),
+    ];
+    
+    for (const pattern of patterns) {
+      if (pattern.test(queryLower)) {
+        // Check if it also contains supported appliance keywords, in which case it might be a comparison
+        if (/(refrigerator|fridge|dishwasher)/i.test(queryLower)) {
+          continue; // Not clearly out of scope, might be comparing to supported appliances
+        }
+        return true; // Definitely out of scope
+      }
+    }
+  }
+  
+  return false;
+}
+
+// Function to check if the LLM response contains out-of-scope content
+function containsOutOfScopeContent(content: string): boolean {
+  const contentLower = content.toLowerCase();
+  const patterns = [
+    /recommend.*\b(oven|microwave|washer|dryer|stove)\b/i,
+    /best\s+(oven|microwave|washer|dryer|stove)\b/i,
+    /information.*\b(oven|microwave|washer|dryer|stove)\b/i,
+    /can.*help.*\b(oven|microwave|washer|dryer|stove)\b/i
+  ];
+  
+  return patterns.some(pattern => pattern.test(contentLower));
+}
+
 export interface SearchProductsRequest {
     query: string;
     category?: string;
@@ -157,28 +203,48 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
     
-    // Check if the request is specifically about appliance parts
-    const isAboutAppliances = /refrigerator|dishwasher|appliance|part|model|ice maker|water filter|freezer|[A-Z0-9]{8,12}/i.test(
-      lastUserMessage.content
-    );
-    
-    // If query is clearly not about appliance parts, provide a redirection response
-    if (!isAboutAppliances && messages.length > 1) {
-      const redirectMessage: Message = {
+    // Check if the query is explicitly about unsupported appliances
+    if (isOutOfScope(lastUserMessage.content)) {
+      const outOfScopeMessage: Message = {
         id: uuidv4(),
         role: 'assistant',
-        content: "I'm specialized in helping with refrigerator and dishwasher parts. If you have questions about parts, compatibility, installation, or troubleshooting for these appliances, I'd be happy to assist. What specific refrigerator or dishwasher part question can I help you with?",
+        content: "I'm sorry, I'm only able to assist with refrigerator and dishwasher parts at this time. I'd be happy to help you find parts, check compatibility, or troubleshoot issues with these specific appliances.",
         timestamp: Date.now(),
       };
       
       return NextResponse.json({
-        message: redirectMessage,
+        message: outOfScopeMessage,
         productResults: [],
       });
     }
     
     // Prepare messages for LLM, including the system message
     let llmMessages = messages;
+    
+    // Make sure there's a system message
+    if (!llmMessages.some(m => m.role === 'system')) {
+      // Use the same system message from useChat.ts
+      const systemMessage: Message = {
+        id: uuidv4(),
+        role: 'system',
+        content: `You are the PartSelect customer service assistant, specialized EXCLUSIVELY in helping customers find and purchase refrigerator and dishwasher parts.
+        
+        IMPORTANT INSTRUCTION: If a user asks about ANY other appliance like ovens, microwaves, washing machines, stoves, or any topic outside of refrigerator and dishwasher parts, you MUST respond with:
+        "I'm sorry, I'm only able to assist with refrigerator and dishwasher parts at this time. I'd be happy to help you find parts, check compatibility, or troubleshoot issues with these specific appliances."
+        
+        NEVER attempt to answer questions about other appliances even if you know the answer.
+        
+        Your responsibilities:
+        1. Help customers identify the correct parts they need based on their appliance model, symptoms, or part numbers
+        2. Answer questions about product compatibility with specific appliance models
+        3. Provide installation guidance and troubleshooting tips for parts
+        4. Assist with understanding product specifications and features
+        5. Guide customers through the purchasing process`,
+        timestamp: Date.now(),
+      };
+      
+      llmMessages = [systemMessage, ...llmMessages];
+    }
     
     // Add information about detected part/model numbers if found
     if (partNumber || modelNumber) {
@@ -286,6 +352,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             const finalResponse = await createCompletion([...llmMessages, contextMessage]);
             llmResponse.content = finalResponse;
         }
+    }
+    
+    // Check if the LLM response inappropriately discusses out-of-scope appliances
+    if (containsOutOfScopeContent(llmResponse.content)) {
+      llmResponse.content = "I'm sorry, I'm only able to assist with refrigerator and dishwasher parts at this time. I'd be happy to help you find parts, check compatibility, or troubleshoot issues with these specific appliances.";
     }
     
     // Create the assistant message
