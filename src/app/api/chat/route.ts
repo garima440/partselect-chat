@@ -502,6 +502,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               
               // Use the filtered products instead of all results
               productResults = filteredProducts;
+
+              if (toolCall.args.modelNumber) {
+                // Check if any products explicitly list this model as compatible
+                const exactCompatMatch = productResults.some(product => 
+                    product.compatibleModels?.some(model => 
+                        model.toLowerCase() === toolCall.args.modelNumber.toLowerCase()
+                    )
+                );
+                
+                if (!exactCompatMatch) {
+                    additionalContext += `\n\nIMPORTANT: None of the found products explicitly list model ${toolCall.args.modelNumber} as compatible. These are the most relevant parts based on your search, but confirm compatibility before purchasing.\n`;
+                }
+            }
+            
               if (result.products && result.products.length > 0) {
                   productResults = result.products;
                   
