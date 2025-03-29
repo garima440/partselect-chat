@@ -1,4 +1,3 @@
-import { Product, ProductResult } from '@/lib/types';
 import { searchProducts as searchProductsInVectorDb } from './vectorDb';
 
 /**

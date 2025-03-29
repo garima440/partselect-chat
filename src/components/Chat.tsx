@@ -87,7 +87,7 @@ const Chat: React.FC = () => {
               <div className="grid grid-cols-1 gap-3 text-sm">
                 <h3 className="text-left text-teal-600 font-medium mb-1">Try asking about:</h3>
                 <button
-                  onClick={() => sendMessage("Is part PS11752778 compatible with my Whirlpool refrigerator?")}
+                  onClick={() => sendMessage("Is part W10295370A compatible with my Whirlpool refrigerator?")}
                   className="p-3 bg-white border border-gray-200 text-left rounded-lg hover:bg-gray-50 transition-colors flex items-center"
                 >
                   <span className="w-8 h-8 mr-2 flex items-center justify-center bg-teal-50 rounded-full text-teal-600 flex-shrink-0">
@@ -111,7 +111,7 @@ const Chat: React.FC = () => {
                 </button>
                 
                 <button
-                  onClick={() => sendMessage("How do I install a water filter for model WRS325SDHZ?")}
+                  onClick={() => sendMessage("How do I install a water filter for model WRS325FDAM02?")}
                   className="p-3 bg-white border border-gray-200 text-left rounded-lg hover:bg-gray-50 transition-colors flex items-center"
                 >
                   <span className="w-8 h-8 mr-2 flex items-center justify-center bg-teal-50 rounded-full text-teal-600 flex-shrink-0">
