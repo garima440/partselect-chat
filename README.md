@@ -79,7 +79,6 @@ partselect-chat/
 │   │   ├── page.tsx        # Homepage with chat interface
 │   │   └── globals.css
 │   ├── components/         # React components
-│   │   ├── ui/             # UI components
 │   │   ├── Chat.tsx        # Main chat component
 │   │   ├── ChatInput.tsx   # User input component
 │   │   ├── ChatMessage.tsx # Message display component
@@ -99,8 +98,6 @@ partselect-chat/
 │       └── api/            
 │           ├── chat/       
 │           │   └── route.ts # Chat API endpoint
-│           └── products/    
-│               └── route.ts # Products API endpoint
 └── scripts/               # Utility scripts
     └── indexProducts.ts   # Script to index products in Pinecone
 ```
