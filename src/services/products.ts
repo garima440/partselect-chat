@@ -1,7 +1,9 @@
 import { Product, ProductResult } from '@/lib/types';
 import { searchProducts as searchProductsInVectorDb } from './vectorDb';
 
-
+/**
+ * Define data structure types for our sample data
+ */
 interface InstallationStepsMap {
 [partNumber: string]: string[];
 }
@@ -14,7 +16,9 @@ interface TroubleshootingApplianceMap {
 [applianceType: string]: TroubleshootingIssuesMap;
 }
 
-// Simulated product database - in a real application, this would be a database call
+/**
+ * Sample installation steps for common parts
+ */
 const SAMPLE_INSTALLATION_STEPS: InstallationStepsMap =  {
   'PS11752778': [
     'Turn off the refrigerator and unplug it from the power outlet.',
@@ -36,6 +40,10 @@ const SAMPLE_INSTALLATION_STEPS: InstallationStepsMap =  {
   // Add more installation steps for other parts as needed
 };
 
+/**
+ * Sample troubleshooting tips for common appliance issues
+ * Organized by appliance type and issue description
+ */
 const SAMPLE_TROUBLESHOOTING_TIPS: TroubleshootingApplianceMap = {
   'refrigerator': {
     'ice maker not working': [
@@ -75,7 +83,10 @@ const SAMPLE_TROUBLESHOOTING_TIPS: TroubleshootingApplianceMap = {
   },
 };
 
-// Function to get installation steps for a part
+/**
+ * Gets step-by-step installation instructions for a specific part
+ * Tries the vector database first, then falls back to sample data
+ */
 export async function getPartInstallationSteps(partNumber: string): Promise<{ steps: string[] }> {
   try {
     // First try to get the part from the vector database
@@ -109,7 +120,10 @@ export async function getPartInstallationSteps(partNumber: string): Promise<{ st
   }
 }
 
-// Function to check if a part is compatible with a model
+/**
+ * Checks if a specific part is compatible with a specific appliance model
+ * Uses the vector database to find and verify compatibility
+ */
 export async function checkCompatibility(
   partNumberOrDescription: string, 
   modelNumber: string
@@ -162,7 +176,10 @@ export async function checkCompatibility(
   }
 }
 
-// Function to get troubleshooting tips
+/**
+ * Gets troubleshooting tips for common appliance issues
+ * Searches for relevant products first, then falls back to sample tips
+ */
 export async function getTroubleshootingTips(
   issue: string,
   applianceType: string,
@@ -199,7 +216,7 @@ export async function getTroubleshootingTips(
       return { tips: [] };
     }
     
-    // Find the most relevant issue
+    // Find the most relevant issue by comparing text similarity
     let bestMatch = '';
     let bestScore = 0;
     
@@ -224,7 +241,10 @@ export async function getTroubleshootingTips(
   }
 }
 
-// Simple string similarity function (Jaccard index)
+/**
+ * Simple string similarity function using Jaccard index
+ * Measures how similar two text strings are based on word overlap
+ */
 function calculateSimilarity(a: string, b: string): number {
   // For a real app, use a proper string similarity algorithm like Levenshtein
   const setA = new Set(a.split(' '));

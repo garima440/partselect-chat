@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Message, ProductResult, ChatState } from '@/lib/types';
 
-// Enhanced system message with product accuracy instructions
+/**
+ * Default system message that tells the AI assistant how to behave
+ * This defines the assistant's capabilities and response style
+ */
 const SYSTEM_MESSAGE: Message = {
     id: uuidv4(),
     role: 'system',
@@ -46,19 +49,23 @@ const SYSTEM_MESSAGE: Message = {
         timestamp: Date.now(),
 };
 
+/**
+ * Custom hook that manages the chat state and provides functions
+ * for sending messages and resetting the chat
+ */
 export function useChat(): ChatState & {
   sendMessage: (content: string) => Promise<void>;
   resetChat: () => void;
 } {
-  // Initialize state
+  // Initialize state for messages, loading status, errors, and product results
   const [state, setState] = useState<ChatState>({
-    messages: [],
-    isLoading: false,
-    error: null,
-    productResults: [],
+    messages: [],          // Chat conversation history
+    isLoading: false,      // Whether we're waiting for a response
+    error: null,           // Any error that occurred
+    productResults: [],    // Product data returned from searches
   });
 
-  // Load chat history from localStorage on component mount
+  // Load saved chat messages from browser storage when the app starts
   useEffect(() => {
     const savedMessages = localStorage.getItem('partselect-chat-messages');
     if (savedMessages) {
@@ -76,14 +83,17 @@ export function useChat(): ChatState & {
     }
   }, []);
 
-  // Save messages to localStorage whenever they change
+  // Save messages to browser storage whenever they change
   useEffect(() => {
     if (state.messages.length > 0) {
       localStorage.setItem('partselect-chat-messages', JSON.stringify(state.messages));
     }
   }, [state.messages]);
 
-  // Extract potential search terms from user message
+  /**
+   * Looks for part numbers and model numbers in the user's message
+   * This helps the assistant understand what specific products the user is asking about
+   */
   const extractSearchTerms = (message: string) => {
     const partNumberRegex = /(?:part(?:\s+number)?(?:\s*#?\s*|\s+)):?\s*([A-Z0-9]{8,12})\b/i;
     const modelNumberRegex = /(?:model(?:\s+number)?(?:\s*#?\s*|\s+)):?\s*([A-Z0-9]{9,12})\b/i;
@@ -100,7 +110,10 @@ export function useChat(): ChatState & {
     };
   };
 
-  // Send message function
+  /**
+   * Sends a user message to the API and gets a response from the assistant
+   * Also handles loading states and error handling
+   */
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
 
@@ -112,7 +125,7 @@ export function useChat(): ChatState & {
     timestamp: Date.now(),
   };
 
-  // Update state with user message and set loading
+  // Update state with user message and set loading status to true
   setState(prevState => ({
     ...prevState,
     messages: [...prevState.messages, userMessage],
@@ -121,7 +134,7 @@ export function useChat(): ChatState & {
   }));
 
   try {
-    // Extract search terms
+    // Extract part numbers and model numbers from the message
     const { partNumber, modelNumber } = extractSearchTerms(content);
     
     // Log extracted terms for debugging
@@ -129,8 +142,8 @@ export function useChat(): ChatState & {
       console.log('Extracted search terms:', { partNumber, modelNumber });
     }
     
-    // NEW CODE: Create a limited context window - only use recent messages
-    // Always include system message, plus last 6 messages (3 exchanges)
+    // Create a limited context window - only use recent messages
+    // to keep the API request smaller and faster
     let messagesToSend = [];
     const allMessages = [...state.messages, userMessage];
     
@@ -143,13 +156,14 @@ export function useChat(): ChatState & {
     }
     
     // Get last 6 messages from conversation (or however many exist if fewer)
+    // This keeps the context window manageable
     const recentMessages = allMessages.filter(m => m.role !== 'system')
                                      .slice(-6);
     
     // Combine system message with recent messages
     messagesToSend = [...messagesToSend, ...recentMessages];
     
-    // Send request to API with the limited context window
+    // Send request to the API with the messages and extracted search terms
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
@@ -168,7 +182,7 @@ export function useChat(): ChatState & {
 
       const data = await response.json();
       
-      // Update state with response
+      // Update state with the assistant's response and any product results
       setState(prevState => ({
         ...prevState,
         messages: [...prevState.messages, data.message],
@@ -185,7 +199,9 @@ export function useChat(): ChatState & {
     }
   }, [state.messages]);
 
-  // Reset chat function
+  /**
+   * Clears all chat messages and resets the state
+   */
   const resetChat = useCallback(() => {
     setState({
       messages: [],

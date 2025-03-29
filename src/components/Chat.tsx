@@ -4,26 +4,31 @@ import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 import { Message} from '@/lib/types';
 
+/**
+ * Main Chat component that handles the entire chat interface
+ */
 const Chat: React.FC = () => {
+  // Get chat functionality from our custom hook
   const { 
-    messages, 
-    isLoading, 
-    error, 
-    sendMessage, 
-    resetChat,
-    productResults
+    messages,       // List of chat messages
+    isLoading,      // Whether we're waiting for a response
+    error,          // Any error that occurred
+    sendMessage,    // Function to send a new message
+    resetChat,      // Function to clear the chat history
+    productResults  // Product data returned from searches
   } = useChat();
   
+  // Reference to the bottom of the messages container for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when messages change
+  // Automatically scroll to the bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   return (
     <>
-      {/* Simple header with clean styling */}
+      {/* Header bar with logo and new chat button */}
       <div className="bg-teal-600 flex items-center justify-between p-4 border-b border-teal-700 text-white">
         <div className="flex items-center">
           <div className="w-10 h-10 flex items-center justify-center bg-white rounded-full mr-3">
@@ -39,6 +44,7 @@ const Chat: React.FC = () => {
           </div>
         </div>
         
+        {/* New chat button to reset the conversation */}
         <button 
           onClick={resetChat}
           className="bg-teal-700 hover:bg-teal-800 px-3 py-2 rounded-md text-sm font-medium transition-colors"
@@ -58,9 +64,10 @@ const Chat: React.FC = () => {
         </button>
       </div>
       
-      {/* Chat messages - simple scrollable container */}
+      {/* Main chat area with messages or welcome screen */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
         {messages.length === 0 ? (
+          // Welcome screen with example questions (shown when no messages yet)
           <div className="flex items-center justify-center h-full text-gray-700">
             <div className="text-center max-w-md p-4 bg-white rounded-lg shadow-sm">
               <div className="mb-6">
@@ -76,6 +83,7 @@ const Chat: React.FC = () => {
                 </p>
               </div>
               
+              {/* Example questions the user can click to start a conversation */}
               <div className="grid grid-cols-1 gap-3 text-sm">
                 <h3 className="text-left text-teal-600 font-medium mb-1">Try asking about:</h3>
                 <button
@@ -117,18 +125,22 @@ const Chat: React.FC = () => {
             </div>
           </div>
         ) : (
+          // Display all chat messages when conversation has started
           messages.map((message: Message, index: number) => (
             <ChatMessage 
               key={index} 
               message={message} 
               isLastMessage={index === messages.length - 1}
               productResults={
+                // Only pass product results to the most recent assistant message
                 message.role === "assistant" && message.id === messages[messages.length - 1].id 
                 ? productResults : []
               }
             />
           ))
         )}
+
+        {/* Loading indicator while waiting for a response */}
         {isLoading && (
           <div className="flex items-center text-gray-500">
             <div className="bg-white px-3 py-2 rounded-lg inline-flex items-center text-sm shadow-sm">
@@ -140,6 +152,8 @@ const Chat: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Display any errors that occur */}
         {error && (
           <div className="p-3 text-red-500 bg-red-50 rounded-md text-sm border border-red-100">
             <div className="flex items-center">
@@ -150,10 +164,12 @@ const Chat: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Hidden element used for auto-scrolling to the bottom */}
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Chat input */}
+      {/* Message input area at the bottom of the chat */}
       <div className="border-t border-gray-200 p-3 bg-white">
         <ChatInput onSendMessage={sendMessage} isLoading={isLoading} />
       </div>

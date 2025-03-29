@@ -1,14 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 
+/**
+ * Props for the ChatInput component
+ */
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
-  isLoading: boolean;
+  onSendMessage: (message: string) => void;  // Function to send the message
+  isLoading: boolean;                        // Whether the app is waiting for a response
 }
 
+/**
+ * Component that handles user message input
+ * Provides a textarea with auto-resizing and submit button
+ */
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
-  const [input, setInput] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [input, setInput] = useState('');                  // Current text in the input field
+  const [isFocused, setIsFocused] = useState(false);       // Whether the input is focused
+  const textareaRef = useRef<HTMLTextAreaElement>(null);   // Reference to the textarea element
 
   // Auto-adjust height of textarea based on content
   useEffect(() => {
@@ -19,6 +26,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
     }
   }, [input]);
 
+  /**
+   * Handles form submission when user clicks send button
+   */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
@@ -32,6 +42,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
     }
   };
 
+  /**
+   * Handles keyboard events in the textarea
+   * Allows sending with Enter key (without Shift)
+   */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Send message on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -40,6 +54,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
     }
   };
 
+  /**
+   * List of possible placeholder messages
+   * Adds variety to the user interface
+   */
   const placeholderOptions = [
     "Ask about refrigerator parts...",
     "Need help finding dishwasher parts?",
@@ -47,12 +65,15 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
     "How can I help with your appliance repair?",
   ];
   
-  // Get random placeholder text
+  /**
+   * Selects a random placeholder from the list
+   */
   const getRandomPlaceholder = () => {
     const randomIndex = Math.floor(Math.random() * placeholderOptions.length);
     return placeholderOptions[randomIndex];
   };
   
+  // Set a random placeholder once when component loads
   const [placeholder] = useState(getRandomPlaceholder());
 
   return (
@@ -71,7 +92,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
           disabled={isLoading}
         />
         
-        {/* Button with animated effect */}
+        {/* Send button with animated effect */}
         <button
           type="submit"
           disabled={!input.trim() || isLoading}

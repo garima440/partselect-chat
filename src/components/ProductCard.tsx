@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { ProductResult } from '@/lib/types';
 
+/**
+ * Props for the ProductCard component
+ */
 interface ProductCardProps {
-  product: ProductResult;
+  product: ProductResult;  // Product data to display
 }
 
+/**
+ * Component that displays a product with image, details, and buttons
+ * Used to show search results in the chat interface
+ */
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);  // Track hover state for animations
   
   return (
     <div 
@@ -14,7 +21,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Product image with hover effect */}
+      {/* Product image area with hover zoom effect */}
       <div className="relative h-48 bg-gray-50 flex items-center justify-center p-4 overflow-hidden">
         {product.imageUrl ? (
           <img
@@ -31,7 +38,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
         
-        {/* Discount badge with animation */}
+        {/* Discount badge with pulsing animation for visibility */}
         {product.discount > 0 && (
           <div className="absolute top-2 right-2">
             <div className="relative">
@@ -43,20 +50,20 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
         
-        {/* Part number badge */}
+        {/* Part number badge for easy reference */}
         <div className="absolute bottom-2 left-2 bg-gray-100 text-gray-600 px-2 py-1 text-xs rounded-md">
           Part #: {product.partNumber}
         </div>
       </div>
       
-      {/* Product info */}
+      {/* Product information section */}
       <div className="flex flex-col p-4 flex-grow">
         <div className="mb-2 flex-grow">
           <h3 className="text-sm font-medium line-clamp-2 text-gray-900" title={product.name}>
             {product.name}
           </h3>
           
-          {/* Compatible models */}
+          {/* Compatible models section with hover tooltip for many models */}
           {product.compatibleModels && product.compatibleModels.length > 0 && (
             <div className="mt-2 text-xs text-gray-500 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -78,7 +85,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           )}
         </div>
         
-        {/* Price area with animation */}
+        {/* Pricing information with original price and savings if on sale */}
         <div className="mt-1 mb-2">
           <div className="flex items-baseline">
             <span className="text-lg font-bold text-gray-900">${product.price.toFixed(2)}</span>
@@ -95,7 +102,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         </div>
         
-        {/* Stock status with indicator */}
+        {/* Inventory status with animated indicator for in-stock items */}
         <div className="mt-1 mb-3 flex items-center">
           {product.inStock ? (
             <div className="flex items-center">
@@ -115,6 +122,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               Out of Stock
             </span>
           )}
+          {/* Delivery estimate if available */}
           {product.deliveryEstimate && (
             <span className="text-xs text-gray-500 ml-2 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -125,8 +133,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           )}
         </div>
         
-        {/* Actions */}
+        {/* Action buttons for the product */}
         <div className="mt-auto flex gap-2">
+          {/* Details button to view full product information */}
           <a
             href={`/product/${product.id}`}
             className="flex-1 text-center text-sm py-2 px-3 bg-white border border-teal-600 text-teal-600 rounded-md hover:bg-teal-50 transition flex items-center justify-center"
@@ -136,6 +145,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </svg>
             Details
           </a>
+          {/* Add to Cart button - disabled if out of stock */}
           <button
             disabled={!product.inStock}
             className={`flex-1 text-center text-sm py-2 px-3 rounded-md transition flex items-center justify-center

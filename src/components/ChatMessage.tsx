@@ -3,12 +3,19 @@ import { Message, ProductResult } from '@/lib/types';
 import ProductCard from './ProductCard';
 import { marked } from 'marked';
 
+/**
+ * Props for the ChatMessage component
+ */
 interface ChatMessageProps {
-  message: Message;
-  isLastMessage?: boolean;
-  productResults?: ProductResult[];
+  message: Message;                      // The message to display
+  isLastMessage?: boolean;               // Whether this is the most recent message
+  productResults?: ProductResult[];      // Product data to show with the message
 }
 
+/**
+ * Component that displays a single chat message
+ * Handles both user and assistant messages with different styling
+ */
 const ChatMessage: React.FC<ChatMessageProps> = ({ 
   message, 
   isLastMessage = false,
@@ -16,7 +23,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 }) => {
   const isUser = message.role === 'user';
   
-  // Convert markdown to HTML
+  /**
+   * Converts markdown in message content to HTML
+   * This allows for rich formatting in assistant messages
+   */
   const renderMarkdown = (content: string) => {
     try {
       return { __html: marked(content) };
@@ -28,7 +38,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-slide-in`}>
-      {/* User avatar for assistant messages */}
+      {/* Assistant avatar (shown on the left for assistant messages) */}
       {!isUser && (
         <div className="w-8 h-8 rounded-full flex items-center justify-center bg-teal-100 mr-2 flex-shrink-0 mt-1">
           <img 
@@ -39,6 +49,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
       )}
       
+      {/* Message bubble with different styling for user vs assistant */}
       <div className={`
         max-w-3xl rounded-lg p-4 shadow-sm
         ${isUser 
@@ -47,7 +58,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         }
         ${isLastMessage && !isUser ? 'ring-2 ring-yellow-200 ring-opacity-50' : ''}
       `}>
-        {/* Message sender */}
+        {/* Message sender label */}
         <div className="font-medium text-sm mb-1 flex items-center">
           {isUser ? (
             <span>You</span>
@@ -59,13 +70,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         </div>
         
-        {/* Message content */}
+        {/* Message content with markdown formatting */}
         <div 
           className={`prose ${isUser ? 'prose-invert' : ''} max-w-none`}
           dangerouslySetInnerHTML={renderMarkdown(message.content)}
         />
         
-        {/* Product results */}
+        {/* Product results section (only shown when products are found) */}
         {productResults && productResults.length > 0 && (
           <div className="mt-5 space-y-4 pt-4 border-t border-gray-200">
             <div className="font-medium flex items-center">
@@ -76,6 +87,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 ? 'I found this product that might help:' 
                 : `I found ${productResults.length} products that might help:`}
             </div>
+            {/* Grid of product cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {productResults.map((product) => (
                 <ProductCard key={product.id} product={product} />
@@ -85,7 +97,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
       </div>
       
-      {/* User avatar for user messages */}
+      {/* User avatar (shown on the right for user messages) */}
       {isUser && (
         <div className="w-8 h-8 rounded-full flex items-center justify-center bg-teal-600 ml-2 flex-shrink-0 mt-1">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

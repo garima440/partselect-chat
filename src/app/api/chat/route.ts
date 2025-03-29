@@ -5,20 +5,24 @@ import { searchProducts } from '@/services/vectorDb';
 import { callLLM, createCompletion } from '@/services/llm';
 import { getPartInstallationSteps, checkCompatibility, getTroubleshootingTips } from '@/services/products';
 
+// Set the server type and maximum time for request processing
 export const runtime = 'edge';
 export const maxDuration = 30; // 30 seconds maximum duration
 
-// Function to check if a query is about unsupported appliances
+/**
+ * Checks if the user's question is about appliances we don't support
+ * (This chatbot only helps with refrigerators and dishwashers)
+ */
 function isOutOfScope(query: string): boolean {
   const queryLower = query.toLowerCase();
   
-  // Keywords for unsupported appliances
+  // List of appliances we don't support
   const unsupportedAppliances = [
     'oven', 'microwave', 'washing machine', 'washer', 'dryer', 
     'stove', 'range', 'air conditioner', 'blender', 'toaster'
   ];
   
-  // Check for explicit mentions of unsupported appliances
+  // Look for patterns that indicate the question is about unsupported appliances
   for (const appliance of unsupportedAppliances) {
     const patterns = [
       new RegExp(`\\b${appliance}\\b`, 'i'),
@@ -29,9 +33,9 @@ function isOutOfScope(query: string): boolean {
     
     for (const pattern of patterns) {
       if (pattern.test(queryLower)) {
-        // Check if it also contains supported appliance keywords, in which case it might be a comparison
+        // If it also mentions supported appliances, it might be a comparison
         if (/(refrigerator|fridge|dishwasher)/i.test(queryLower)) {
-          continue; // Not clearly out of scope, might be comparing to supported appliances
+          continue; // Not clearly out of scope
         }
         return true; // Definitely out of scope
       }
@@ -41,7 +45,9 @@ function isOutOfScope(query: string): boolean {
   return false;
 }
 
-// Function to check if the LLM response contains out-of-scope content
+/**
+ * Checks if the AI's response accidentally talks about appliances we don't support
+ */
 function containsOutOfScopeContent(content: string): boolean {
   const contentLower = content.toLowerCase();
   const patterns = [
@@ -54,7 +60,10 @@ function containsOutOfScopeContent(content: string): boolean {
   return patterns.some(pattern => pattern.test(contentLower));
 }
 
-// Function to verify product information in responses
+/**
+ * Makes sure product information is accurate in the AI's response
+ * If there are errors, it replaces the response with correct information
+ */
 function verifyProductResponse(content: string, productResults: ProductResult[]): string {
   // Skip verification if no products or empty content
   if (!productResults.length || !content.trim()) {
@@ -100,7 +109,7 @@ function verifyProductResponse(content: string, productResults: ProductResult[])
       }
       
       if (hasErrors) {
-        // Generate corrected response
+        // Generate corrected response with accurate product information
         verifiedContent = `I found information about part number ${product.partNumber}:
 
 This is a ${product.brand} ${product.name} for ${product.category}s${product.subcategory ? ` (${product.subcategory})` : ''}.
@@ -122,7 +131,10 @@ Would you like more information about this part or help with anything else?`;
   return verifiedContent;
 }
 
-
+/**
+ * Narrows down product search results to the most relevant ones
+ * Makes the response more focused and helpful
+ */
 function filterProductResults(
   productResults: ProductResult[], 
   toolCall: ToolCall, 
@@ -210,6 +222,7 @@ function filterProductResults(
   return productResults;
 }
 
+// Define what the search product request looks like
 export interface SearchProductsRequest {
     query: string;
     category?: string;
@@ -219,7 +232,7 @@ export interface SearchProductsRequest {
     limit?: number;
 }
 
-// Define available tools
+// List of tools the AI assistant can use to help customers
 const tools = [
   {
     type: 'function',
@@ -314,7 +327,10 @@ const tools = [
   },
 ];
 
-// Handle function calls based on tool name
+/**
+ * Runs the tool that the AI assistant decided to use
+ * Tools help find products, check compatibility, etc.
+ */
 async function executeToolCall(toolCall: ToolCall): Promise<any> {
     const { name, args } = toolCall;
     
@@ -363,6 +379,10 @@ async function executeToolCall(toolCall: ToolCall): Promise<any> {
     }
   }
 
+/**
+ * Main function that handles all chat requests
+ * This is the entry point for the API
+ */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Parse request
@@ -397,7 +417,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Prepare messages for LLM, including the system message
     let llmMessages = messages;
     
-    // Make sure there's a system message
+    // Make sure there's a system message (instructions for the AI)
     if (!llmMessages.some(m => m.role === 'system')) {
       // Enhanced system message with product information accuracy guidelines
       const systemMessage: Message = {
@@ -459,10 +479,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log('Info for LLM:', infoMessage);
     }
     
-    // Call the LLM
+    // Call the AI (LLM) to generate a response
     const llmResponse = await callLLM(llmMessages, tools);
     
-    // Process any tool calls
+    // Process any tool calls that the AI decided to use
     let productResults: ProductResult[] = [];
     let additionalContext = '';
     
@@ -579,7 +599,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             }
         }
         
-        // If we have additional context, do a final LLM call to incorporate it
+        // If we have additional context, do a final AI call to incorporate it
         if (additionalContext) {
             console.log('Additional context:', additionalContext);
             
@@ -597,12 +617,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
     }
     
-    // Check if the LLM response inappropriately discusses out-of-scope appliances
+    // Check if the AI response inappropriately discusses out-of-scope appliances
     if (containsOutOfScopeContent(llmResponse.content)) {
       llmResponse.content = "I'm sorry, I'm only able to assist with refrigerator and dishwasher parts at this time. I'd be happy to help you find parts, check compatibility, or troubleshoot issues with these specific appliances.";
     }
     
-    // Verify product information
+    // Verify product information in the response
     if (productResults.length > 0) {
       llmResponse.content = verifyProductResponse(llmResponse.content, productResults);
     }
@@ -625,6 +645,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     console.error('Error processing chat request:', error);
     
+    // Handle errors gracefully
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : 'An unknown error occurred',
