@@ -104,48 +104,63 @@ export function useChat(): ChatState & {
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
 
-    // Create new user message
-    const userMessage: Message = {
-      id: uuidv4(),
-      role: 'user',
-      content,
-      timestamp: Date.now(),
-    };
+  // Create new user message
+  const userMessage: Message = {
+    id: uuidv4(),
+    role: 'user',
+    content,
+    timestamp: Date.now(),
+  };
 
-    // Update state with user message and set loading
-    setState(prevState => ({
-      ...prevState,
-      messages: [...prevState.messages, userMessage],
-      isLoading: true,
-      error: null,
-    }));
+  // Update state with user message and set loading
+  setState(prevState => ({
+    ...prevState,
+    messages: [...prevState.messages, userMessage],
+    isLoading: true,
+    error: null,
+  }));
 
-    try {
-      // Extract search terms
-      const { partNumber, modelNumber } = extractSearchTerms(content);
-      
-      // Log extracted terms for debugging
-      if (partNumber || modelNumber) {
-        console.log('Extracted search terms:', { partNumber, modelNumber });
-      }
-      
-      // Prepare all messages for context
-      const allMessages = state.messages.length > 0 
-        ? [...state.messages, userMessage] 
-        : [SYSTEM_MESSAGE, userMessage];
-
-      // Send request to API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: allMessages,
-          partNumber,
-          modelNumber,
-        }),
-      });
+  try {
+    // Extract search terms
+    const { partNumber, modelNumber } = extractSearchTerms(content);
+    
+    // Log extracted terms for debugging
+    if (partNumber || modelNumber) {
+      console.log('Extracted search terms:', { partNumber, modelNumber });
+    }
+    
+    // NEW CODE: Create a limited context window - only use recent messages
+    // Always include system message, plus last 6 messages (3 exchanges)
+    let messagesToSend = [];
+    const allMessages = [...state.messages, userMessage];
+    
+    // Always include system message if it exists
+    const systemMessage = allMessages.find(m => m.role === 'system');
+    if (systemMessage) {
+      messagesToSend.push(systemMessage);
+    } else {
+      messagesToSend.push(SYSTEM_MESSAGE);
+    }
+    
+    // Get last 6 messages from conversation (or however many exist if fewer)
+    const recentMessages = allMessages.filter(m => m.role !== 'system')
+                                     .slice(-6);
+    
+    // Combine system message with recent messages
+    messagesToSend = [...messagesToSend, ...recentMessages];
+    
+    // Send request to API with the limited context window
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: messagesToSend,
+        partNumber,
+        modelNumber,
+      }),
+    });
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
