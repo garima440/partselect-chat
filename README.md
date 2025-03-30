@@ -140,10 +140,16 @@ Create a `.env.local` file with:
 ```
 DEEPSEEK_API_KEY=your_deepseek_api_key
 DEEPSEEK_API_URL=https://api.deepseek.com/v1/chat/completions
-OPENAI_API_KEY=your_openai_api_key 
 MODEL_NAME=deepseek-chat
+
+OPENAI_API_KEY=your_openai_api_key
+EMBEDDING_MODEL=text-embedding-3-small
+
 PINECONE_API_KEY=your_pinecone_api_key
-PINECONE_INDEX_NAME=partselect-products
+PINECONE_INDEX_NAME=your_index_name
+PINECONE_ENVIRONMENT=your_pinecone_environment
+PINECONE_NAMESPACE=your_namespace
+
 ```
 
 ### Installation
@@ -157,7 +163,7 @@ cd partselect-chat
 npm install
 
 # Index product data (only needed once)
-npm run index-products
+npm run index-products 
 
 # Start development server
 npm run dev
