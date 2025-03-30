@@ -29,6 +29,9 @@ The application follows a modular architecture with four key layers:
 
 ### Request Flow
 
+![partselect-architecture (1)](https://github.com/user-attachments/assets/c9e41268-78df-4ad0-86d8-ad0c529db89e)
+
+
 1. User sends a question through the chat interface
 2. Frontend extracts part/model numbers and sends request to API
 3. API adds system prompt and forwards to Deepseek LLM
@@ -77,6 +80,9 @@ partselect-chat/
 │   └── favicon.ico
 ├── src/
 │   ├── app/                # Next.js App Router
+|   |   |  └── api/            
+│   |   |    ├── chat/       
+│   |   |        └── route.ts # Chat API endpoint
 │   │   ├── layout.tsx
 │   │   ├── page.tsx        # Homepage with chat interface
 │   │   └── globals.css
@@ -96,10 +102,7 @@ partselect-chat/
 │   │   ├── embedding.ts    # OpenAI embedding service
 │   │   ├── products.ts     # Product data service
 │   │   └── vectorDb.ts     # Vector database service
-│   └── app/                # API routes
-│       └── api/            
-│           ├── chat/       
-│           │   └── route.ts # Chat API endpoint
+│      
 └── scripts/               # Utility scripts
     └── indexProducts.ts   # Script to index products in Pinecone
 ```
